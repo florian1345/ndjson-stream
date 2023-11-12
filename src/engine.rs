@@ -2,6 +2,14 @@ use std::collections::VecDeque;
 
 use serde::Deserialize;
 
+fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {
+    data.iter().enumerate()
+        .find(|&(_, item)| item == &search)
+        .map(|(index, _)| index)
+}
+
+const NEW_LINE: u8 = b'\n';
+
 /// The low-level engine parsing NDJSON-data given as byte slices into objects of the type parameter
 /// `T`. Data is supplied in chunks and parsed objects can subsequently be read from a queue.
 ///
@@ -24,18 +32,10 @@ impl<T> NdjsonEngine<T> {
 
     /// Reads the next element from the queue of parsed items, if sufficient NDJSON-data has been
     /// supplied previously via [NdjsonEngine::input]. Otherwise, `None` is returned.
-    pub fn next(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
         self.out_queue.pop_front()
     }
 }
-
-fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {
-    data.iter().enumerate()
-        .find(|&(_, item)| item == &search)
-        .map(|(index, _)| index)
-}
-
-const NEW_LINE: u8 = b'\n';
 
 impl<T> NdjsonEngine<T>
 where
@@ -69,6 +69,12 @@ where
     }
 }
 
+impl<T> Default for NdjsonEngine<T> {
+    fn default() -> NdjsonEngine<T> {
+        NdjsonEngine::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -87,7 +93,7 @@ mod tests {
     }
 
     fn collect_output(mut engine: NdjsonEngine<TestStruct>) -> Vec<TestStruct> {
-        iter::from_fn(|| engine.next()).collect::<Vec<_>>()
+        iter::from_fn(|| engine.pop()).collect::<Vec<_>>()
     }
 
     #[test]
