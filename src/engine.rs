@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use serde::Deserialize;
 
 use serde_json::error::Result as JsonResult;
+use crate::bytes::AsBytes;
 
 fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {
     data.iter().enumerate()
@@ -49,7 +50,9 @@ where
     /// Parses the given data as NDJSON. In case the end does not match up with a newline, the rest
     /// is stored in an internal cache. Consequently, the rest from a previous call to this method
     /// is prepended to the given data in case a newline is encountered.
-    pub fn input(&mut self, mut data: &[u8]) {
+    pub fn input(&mut self, data: impl AsBytes) {
+        let mut data = data.as_bytes();
+
         while let Some(newline_idx) = index_of(data, NEW_LINE) {
             let data_until_split = &data[..newline_idx];
 
@@ -81,7 +84,7 @@ impl<T> Default for NdjsonEngine<T> {
 
 #[cfg(test)]
 mod tests {
-
+    use std::borrow::Cow;
     use crate::engine::NdjsonEngine;
 
     use kernal::prelude::*;
@@ -91,8 +94,10 @@ mod tests {
     use serde_json::error::Result as JsonResult;
 
     use std::iter;
+    use std::rc::Rc;
+    use std::sync::Arc;
 
-    #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
     struct TestStruct {
         key: u64,
         value: u64
@@ -114,7 +119,7 @@ mod tests {
     fn incomplete_input() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":3,\"val");
+        engine.input("{\"key\":3,\"val");
 
         assert_that!(collect_output(engine)).is_empty();
     }
@@ -123,7 +128,7 @@ mod tests {
     fn single_exact_input() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":3,\"value\":4}\n");
+        engine.input("{\"key\":3,\"value\":4}\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -135,8 +140,8 @@ mod tests {
     fn single_item_split_into_two_inputs() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":42,");
-        engine.input(b"\"value\":24}\n");
+        engine.input("{\"key\":42,");
+        engine.input("\"value\":24}\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -148,7 +153,7 @@ mod tests {
     fn two_items_in_single_input() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":1,\"value\":1}\n{\"key\":2,\"value\":2}\n");
+        engine.input("{\"key\":1,\"value\":1}\n{\"key\":2,\"value\":2}\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -161,11 +166,11 @@ mod tests {
     fn two_items_in_many_inputs_with_rest() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":12,\"v");
-        engine.input(b"alue\":3");
-        engine.input(b"4}\n{\"key");
-        engine.input(b"\":56,\"valu");
-        engine.input(b"e\":78}\n{\"key\":");
+        engine.input("{\"key\":12,\"v");
+        engine.input("alue\":3");
+        engine.input("4}\n{\"key");
+        engine.input("\":56,\"valu");
+        engine.input("e\":78}\n{\"key\":");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -178,9 +183,9 @@ mod tests {
     fn input_completing_previous_rest_then_multiple_complete_items_and_more_rest() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":9,\"value\":");
-        engine.input(b"8}\n{\"key\":7,\"value\":6}\n{\"key\":5,\"value\":4}\n{\"key\":");
-        engine.input(b"3,\"value\":2}\n{");
+        engine.input("{\"key\":9,\"value\":");
+        engine.input("8}\n{\"key\":7,\"value\":6}\n{\"key\":5,\"value\":4}\n{\"key\":");
+        engine.input("3,\"value\":2}\n{");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -195,7 +200,7 @@ mod tests {
     fn carriage_return_handled_gracefully() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":1,\"value\":2}\r\n{\"key\":3,\"value\":4}\r\n");
+        engine.input("{\"key\":1,\"value\":2}\r\n{\"key\":3,\"value\":4}\r\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -208,7 +213,7 @@ mod tests {
     fn whitespace_handled_gracefully() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"\t{ \"key\":\t13,  \"value\":   37 } \r\n");
+        engine.input("\t{ \"key\":\t13,  \"value\":   37 } \r\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -220,7 +225,7 @@ mod tests {
     fn erroneous_entry_emitted_as_json_error() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":1}\n{\"key\":1,\"value\":1}\n");
+        engine.input("{\"key\":1}\n{\"key\":1,\"value\":1}\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
@@ -233,14 +238,34 @@ mod tests {
     fn error_from_split_entry() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
-        engine.input(b"{\"key\":100,\"value\":200}\n{\"key\":");
-        engine.input(b"\"should be a number\",\"value\":0}\n{\"key\":300,\"value\":400}\n");
+        engine.input("{\"key\":100,\"value\":200}\n{\"key\":");
+        engine.input("\"should be a number\",\"value\":0}\n{\"key\":300,\"value\":400}\n");
 
         assert_that!(collect_output(engine))
             .satisfies_exactly_in_given_order(dyn_assertions!(
                 |it| assert_that!(it).contains_value(TestStruct { key: 100, value: 200 }),
                 |it| assert_that!(it).is_err(),
                 |it| assert_that!(it).contains_value(TestStruct { key: 300, value: 400 })
+            ));
+    }
+
+    #[test]
+    fn engine_input_works_for_different_types() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::default();
+
+        engine.input(b"{\"k");
+        engine.input(b"ey\"".to_vec());
+        engine.input(":12".to_string());
+        engine.input(&mut ",\"v".to_string());
+        engine.input("alu".to_string().into_boxed_str());
+        engine.input(b"e\"".to_vec().into_boxed_slice());
+        engine.input(Arc::<str>::from(":3"));
+        engine.input(Rc::<[u8]>::from(&b"4}"[..]));
+        engine.input(Cow::Borrowed(&b"\r\n".to_vec()));
+
+        assert_that!(collect_output(engine))
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 12, value: 34 })
             ));
     }
 }
