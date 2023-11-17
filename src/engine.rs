@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 
 use serde::Deserialize;
 
+use serde_json::error::Result as JsonResult;
+
 fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {
     data.iter().enumerate()
         .find(|&(_, item)| item == &search)
@@ -17,7 +19,7 @@ const NEW_LINE: u8 = b'\n';
 /// interface such as iterators.
 pub struct NdjsonEngine<T> {
     in_queue: Vec<u8>,
-    out_queue: VecDeque<T>
+    out_queue: VecDeque<JsonResult<T>>
 }
 
 impl<T> NdjsonEngine<T> {
@@ -31,8 +33,10 @@ impl<T> NdjsonEngine<T> {
     }
 
     /// Reads the next element from the queue of parsed items, if sufficient NDJSON-data has been
-    /// supplied previously via [NdjsonEngine::input]. Otherwise, `None` is returned.
-    pub fn pop(&mut self) -> Option<T> {
+    /// supplied previously via [NdjsonEngine::input], that is, a newline character has been
+    /// observed. If the input until the newline is not valid JSON, the parse error is returned. If
+    /// no element is available in the queue, `None` is returned.
+    pub fn pop(&mut self) -> Option<JsonResult<T>> {
         self.out_queue.pop_front()
     }
 }
@@ -58,7 +62,7 @@ where
             };
 
             // TODO error handling, whitespace handling (?)
-            let next_item = serde_json::from_slice(next_item_bytes).unwrap();
+            let next_item = serde_json::from_slice(next_item_bytes);
             self.out_queue.push_back(next_item);
 
             self.in_queue.clear();
@@ -84,6 +88,8 @@ mod tests {
 
     use serde::Deserialize;
 
+    use serde_json::error::Result as JsonResult;
+
     use std::iter;
 
     #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -92,7 +98,8 @@ mod tests {
         value: u64
     }
 
-    fn collect_output(mut engine: NdjsonEngine<TestStruct>) -> Vec<TestStruct> {
+    fn collect_output(mut engine: NdjsonEngine<TestStruct>)
+            -> Vec<JsonResult<TestStruct>> {
         iter::from_fn(|| engine.pop()).collect::<Vec<_>>()
     }
 
@@ -119,7 +126,9 @@ mod tests {
         engine.input(b"{\"key\":3,\"value\":4}\n");
 
         assert_that!(collect_output(engine))
-            .contains_exactly_in_given_order([TestStruct { key: 3, value: 4 }]);
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 3, value: 4 })
+            ));
     }
 
     #[test]
@@ -130,7 +139,9 @@ mod tests {
         engine.input(b"\"value\":24}\n");
 
         assert_that!(collect_output(engine))
-            .contains_exactly_in_given_order([TestStruct { key: 42, value: 24 }]);
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 42, value: 24 })
+            ));
     }
 
     #[test]
@@ -140,10 +151,10 @@ mod tests {
         engine.input(b"{\"key\":1,\"value\":1}\n{\"key\":2,\"value\":2}\n");
 
         assert_that!(collect_output(engine))
-            .contains_exactly_in_given_order([
-                TestStruct { key: 1, value: 1 },
-                TestStruct { key: 2, value: 2 }
-            ]);
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 1, value: 1 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 2, value: 2 })
+            ));
     }
 
     #[test]
@@ -157,10 +168,10 @@ mod tests {
         engine.input(b"e\":78}\n{\"key\":");
 
         assert_that!(collect_output(engine))
-            .contains_exactly_in_given_order([
-                TestStruct { key: 12, value: 34 },
-                TestStruct { key: 56, value: 78 }
-            ]);
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 12, value: 34 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 56, value: 78 })
+            ));
     }
 
     #[test]
@@ -170,9 +181,22 @@ mod tests {
         engine.input(b"{\"key\":1,\"value\":2}\r\n{\"key\":3,\"value\":4}\r\n");
 
         assert_that!(collect_output(engine))
-            .contains_exactly_in_given_order([
-                TestStruct { key: 1, value: 2 },
-                TestStruct { key: 3, value: 4 }
-            ]);
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 1, value: 2 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 3, value: 4 })
+            ));
+    }
+
+    #[test]
+    fn erroneous_entry_emitted_as_json_error() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
+
+        engine.input(b"{\"key\":1}\n{\"key\":1,\"value\":1}\n");
+
+        assert_that!(collect_output(engine))
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).is_err(),
+                |it| assert_that!(it).is_ok()
+            ));
     }
 }

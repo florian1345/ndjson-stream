@@ -11,4 +11,4 @@ serde_json = "1.0"
 
 [dev-dependencies]
 serde = { version = "1.0", features = [ "derive" ] }
-kernal = "0.2"
+kernal = "0.3"
