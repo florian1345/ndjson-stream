@@ -175,6 +175,23 @@ mod tests {
     }
 
     #[test]
+    fn input_completing_previous_rest_then_multiple_complete_items_and_more_rest() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
+
+        engine.input(b"{\"key\":9,\"value\":");
+        engine.input(b"8}\n{\"key\":7,\"value\":6}\n{\"key\":5,\"value\":4}\n{\"key\":");
+        engine.input(b"3,\"value\":2}\n{");
+
+        assert_that!(collect_output(engine))
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 9, value: 8 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 7, value: 6 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 5, value: 4 }),
+                |it| assert_that!(it).contains_value(TestStruct { key: 3, value: 2 })
+            ));
+    }
+
+    #[test]
     fn carriage_return_handled_gracefully() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
@@ -188,6 +205,18 @@ mod tests {
     }
 
     #[test]
+    fn whitespace_handled_gracefully() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
+
+        engine.input(b"\t{ \"key\":\t13,  \"value\":   37 } \r\n");
+
+        assert_that!(collect_output(engine))
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 13, value: 37 })
+            ));
+    }
+
+    #[test]
     fn erroneous_entry_emitted_as_json_error() {
         let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
 
@@ -197,6 +226,21 @@ mod tests {
             .satisfies_exactly_in_given_order(dyn_assertions!(
                 |it| assert_that!(it).is_err(),
                 |it| assert_that!(it).is_ok()
+            ));
+    }
+
+    #[test]
+    fn error_from_split_entry() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
+
+        engine.input(b"{\"key\":100,\"value\":200}\n{\"key\":");
+        engine.input(b"\"should be a number\",\"value\":0}\n{\"key\":300,\"value\":400}\n");
+
+        assert_that!(collect_output(engine))
+            .satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 100, value: 200 }),
+                |it| assert_that!(it).is_err(),
+                |it| assert_that!(it).contains_value(TestStruct { key: 300, value: 400 })
             ));
     }
 }
