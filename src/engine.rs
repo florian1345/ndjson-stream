@@ -84,24 +84,18 @@ impl<T> Default for NdjsonEngine<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-    use crate::engine::NdjsonEngine;
 
     use kernal::prelude::*;
 
-    use serde::Deserialize;
-
     use serde_json::error::Result as JsonResult;
 
+    use std::borrow::Cow;
     use std::iter;
     use std::rc::Rc;
     use std::sync::Arc;
 
-    #[derive(Debug, Deserialize, Eq, PartialEq)]
-    struct TestStruct {
-        key: u64,
-        value: u64
-    }
+    use crate::engine::NdjsonEngine;
+    use crate::test_struct::TestStruct;
 
     fn collect_output(mut engine: NdjsonEngine<TestStruct>)
             -> Vec<JsonResult<TestStruct>> {
