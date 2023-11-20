@@ -2,6 +2,7 @@ pub mod bytes;
 pub mod driver;
 pub mod engine;
 
+#[cfg(feature = "iter")]
 pub use crate::driver::iter::from_iter;
 
 #[cfg(test)]
