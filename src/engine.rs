@@ -262,4 +262,21 @@ mod tests {
                 |it| assert_that!(it).contains_value(TestStruct { key: 12, value: 34 })
             ));
     }
+
+    #[test]
+    fn old_data_is_discarded() {
+        let mut engine: NdjsonEngine<TestStruct> = NdjsonEngine::new();
+        let count = 20;
+
+        engine.input("{ \"key\": 1, ");
+
+        for _ in 0..(count - 1) {
+            engine.input("\"value\": 2 }\r\n{ \"key\": 1, ");
+        }
+
+        engine.input("\"value\": 2 }\r\n");
+
+        assert_that!(engine.in_queue).is_empty();
+        assert_that!(engine.out_queue).has_length(count);
+    }
 }
