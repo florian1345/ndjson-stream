@@ -95,7 +95,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::engine::NdjsonEngine;
-    use crate::test_struct::TestStruct;
+    use crate::test_util::TestStruct;
 
     fn collect_output(mut engine: NdjsonEngine<TestStruct>)
             -> Vec<JsonResult<TestStruct>> {

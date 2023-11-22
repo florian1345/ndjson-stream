@@ -6,13 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+futures = { version = "0.3", optional = true }
+pin-project-lite = { version = "0.2", optional = true }
 serde = "1.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-serde = { version = "1.0", features = [ "derive" ] }
 kernal = "0.3"
+serde = { version = "1.0", features = [ "derive" ] }
+tokio-test = "0.4"
 
 [features]
 default = [ "iter" ]
 iter = []
+streams = [ "dep:futures", "dep:pin-project-lite" ]
