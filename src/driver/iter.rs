@@ -80,7 +80,7 @@ mod tests {
 
     use std::iter;
 
-    use crate::test_struct::TestStruct;
+    use crate::test_util::{SingleThenPanicIter, TestStruct};
 
     fn collect<I>(into_iter: I) -> Vec<JsonResult<TestStruct>>
     where
@@ -115,18 +115,6 @@ mod tests {
 
     #[test]
     fn wrapped_iter_not_queried_while_sufficient_data_remains() {
-        struct SingleThenPanicIter {
-            data: Option<String>
-        }
-
-        impl Iterator for SingleThenPanicIter {
-            type Item = String;
-
-            fn next(&mut self) -> Option<String> {
-                Some(self.data.take().expect("iterator queried twice"))
-            }
-        }
-
         let iter = SingleThenPanicIter {
             data: Some("{\"key\":1,\"value\":2}\n{\"key\":3,\"value\":4}\n".to_owned())
         };
