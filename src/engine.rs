@@ -276,7 +276,7 @@ mod tests {
 
         engine.input("\"value\": 2 }\r\n");
 
-        assert_that!(engine.in_queue.len()).is_zero();
-        assert_that!(engine.out_queue.len()).is_equal_to(count);
+        assert_that!(engine.in_queue).is_empty();
+        assert_that!(engine.out_queue).has_length(count);
     }
 }
