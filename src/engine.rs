@@ -1,9 +1,12 @@
 use std::collections::VecDeque;
+use std::str;
 
 use serde::Deserialize;
 
 use serde_json::error::Result as JsonResult;
+
 use crate::bytes::AsBytes;
+use crate::config::{EmptyLineHandling, NdjsonConfig};
 
 fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {
     data.iter().enumerate()
@@ -20,16 +23,25 @@ const NEW_LINE: u8 = b'\n';
 /// interface such as iterators.
 pub struct NdjsonEngine<T> {
     in_queue: Vec<u8>,
-    out_queue: VecDeque<JsonResult<T>>
+    out_queue: VecDeque<JsonResult<T>>,
+    config: NdjsonConfig
 }
 
 impl<T> NdjsonEngine<T> {
 
-    /// Creates a new NDJSON-engine for objects of the given type parameter.
+    /// Creates a new NDJSON-engine for objects of the given type parameter with default
+    /// [NdjsonConfig].
     pub fn new() -> NdjsonEngine<T> {
+        NdjsonEngine::with_config(NdjsonConfig::default())
+    }
+
+    /// Creates a new NDJSON-engine for objects of the given type parameter with the given
+    /// [NdjsonConfig] to control its behavior. See [NdjsonConfig] for more details.
+    pub fn with_config(config: NdjsonConfig) -> NdjsonEngine<T> {
         NdjsonEngine {
             in_queue: Vec::new(),
-            out_queue: VecDeque::new()
+            out_queue: VecDeque::new(),
+            config
         }
     }
 
@@ -39,6 +51,28 @@ impl<T> NdjsonEngine<T> {
     /// no element is available in the queue, `None` is returned.
     pub fn pop(&mut self) -> Option<JsonResult<T>> {
         self.out_queue.pop_front()
+    }
+}
+
+fn is_blank(string: &str) -> bool {
+    string.chars().all(char::is_whitespace)
+}
+
+fn parse_line<T>(bytes: &[u8], empty_line_handling: EmptyLineHandling) -> Option<JsonResult<T>>
+where
+    for<'deserialize> T: Deserialize<'deserialize>
+{
+    let should_ignore = match empty_line_handling {
+        EmptyLineHandling::ParseAlways => false,
+        EmptyLineHandling::IgnoreEmpty => bytes.is_empty() || bytes == [b'\r'],
+        EmptyLineHandling::IgnoreBlank => str::from_utf8(bytes).is_ok_and(is_blank)
+    };
+
+    if should_ignore {
+        None
+    }
+    else {
+        Some(serde_json::from_slice(bytes))
     }
 }
 
@@ -64,9 +98,11 @@ where
                 &self.in_queue
             };
 
-            // TODO error handling, whitespace handling (?)
-            let next_item = serde_json::from_slice(next_item_bytes);
-            self.out_queue.push_back(next_item);
+            // TODO error handling
+
+            if let Some(item) = parse_line(next_item_bytes, self.config.empty_line_handling) {
+                self.out_queue.push_back(item);
+            }
 
             self.in_queue.clear();
             data = &data[(newline_idx + 1)..];
@@ -93,6 +129,7 @@ mod tests {
     use std::iter;
     use std::rc::Rc;
     use std::sync::Arc;
+    use crate::config::{EmptyLineHandling, NdjsonConfig};
 
     use crate::engine::NdjsonEngine;
     use crate::test_util::TestStruct;
@@ -278,5 +315,56 @@ mod tests {
 
         assert_that!(engine.in_queue).is_empty();
         assert_that!(engine.out_queue).has_length(count);
+    }
+
+    fn engine_with_empty_line_handling(empty_line_handling: EmptyLineHandling)
+            -> NdjsonEngine<TestStruct> {
+        let config = NdjsonConfig::default().with_empty_line_handling(empty_line_handling);
+        NdjsonEngine::with_config(config)
+    }
+
+    #[test]
+    fn raises_error_when_parsing_empty_line_in_parse_always_mode() {
+        let mut engine = engine_with_empty_line_handling(EmptyLineHandling::ParseAlways);
+
+        engine.input("{\"key\":1,\"value\":2}\n\n{\"key\":3,\"value\":4}\n");
+
+        assert_that!(collect_output(engine)).contains_elements_matching(Result::is_err);
+    }
+
+    #[test]
+    fn does_not_raise_error_when_parsing_empty_line_in_ignore_empty_mode() {
+        let mut engine = engine_with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+
+        engine.input("{\"key\":1,\"value\":2}\n\n{\"key\":3,\"value\":4}\n");
+
+        assert_that!(collect_output(engine)).does_not_contain_elements_matching(Result::is_err);
+    }
+
+    #[test]
+    fn does_not_raise_error_when_parsing_empty_line_with_carriage_return_in_ignore_empty_mode() {
+        let mut engine = engine_with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+
+        engine.input("{\"key\":1,\"value\":2}\r\n\r\n{\"key\":3,\"value\":4}\n");
+
+        assert_that!(collect_output(engine)).does_not_contain_elements_matching(Result::is_err);
+    }
+
+    #[test]
+    fn raises_error_when_parsing_non_empty_blank_line_in_ignore_empty_mode() {
+        let mut engine = engine_with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+
+        engine.input("{\"key\":1,\"value\":2}\n \t\r\n{\"key\":3,\"value\":4}\n");
+
+        assert_that!(collect_output(engine)).contains_elements_matching(Result::is_err);
+    }
+
+    #[test]
+    fn does_not_raise_error_when_parsing_non_empty_blank_line_in_ignore_blank_mode() {
+        let mut engine = engine_with_empty_line_handling(EmptyLineHandling::IgnoreBlank);
+
+        engine.input("{\"key\":1,\"value\":2}\n \t\r\n{\"key\":3,\"value\":4}\n");
+
+        assert_that!(collect_output(engine)).does_not_contain_elements_matching(Result::is_err);
     }
 }
