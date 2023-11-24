@@ -1,9 +1,10 @@
 /// Controls how the parser deals with lines that contain no JSON values.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum EmptyLineHandling {
 
     /// Parse every line, i.e. every segment between `\n` characters, even if it is empty. This will
     /// result in errors for empty lines.
+    #[default]
     ParseAlways,
 
     /// Ignore lines, i.e. segments between `\n` characters, which are empty, i.e. contain no
@@ -14,12 +15,6 @@ pub enum EmptyLineHandling {
     /// Ignore lines, i.e. segments between `\n` characters, which contain only whitespace
     /// characters.
     IgnoreBlank
-}
-
-impl Default for EmptyLineHandling {
-    fn default() -> EmptyLineHandling {
-        EmptyLineHandling::ParseAlways
-    }
 }
 
 /// Configuration for the NDJSON-parser which controls the behavior in various situations.
@@ -38,8 +33,7 @@ impl NdjsonConfig {
     /// A new config with all the same values as this one, except the empty-line-handling.
     pub fn with_empty_line_handling(self, empty_line_handling: EmptyLineHandling) -> NdjsonConfig {
         NdjsonConfig {
-            empty_line_handling,
-            ..self
+            empty_line_handling
         }
     }
 }
