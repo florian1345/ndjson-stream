@@ -6,8 +6,14 @@ pub mod config;
 #[cfg(feature = "iter")]
 pub use crate::driver::iter::from_iter;
 
+#[cfg(feature = "iter")]
+pub use crate::driver::iter::from_iter_with_config;
+
 #[cfg(feature = "streams")]
 pub use crate::driver::streams::from_stream;
+
+#[cfg(feature = "streams")]
+pub use crate::driver::streams::from_stream_with_config;
 
 #[cfg(test)]
 pub(crate) mod test_util {
