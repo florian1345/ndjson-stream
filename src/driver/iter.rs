@@ -1,4 +1,5 @@
 use crate::bytes::AsBytes;
+use crate::config::NdjsonConfig;
 use crate::engine::NdjsonEngine;
 
 use serde::Deserialize;
@@ -6,8 +7,8 @@ use serde::Deserialize;
 use serde_json::error::Result as JsonResult;
 
 /// Wraps an iterator of data blocks, i.e. types implementing [AsBytes], and offers an [Iterator]
-/// implementation over parsed NDJSON-records according to [Deserialize]. See [from_iter] for more
-/// details.
+/// implementation over parsed NDJSON-records according to [Deserialize]. See [from_iter] and
+/// [from_iter_with_config] for more details.
 pub struct NdjsonIter<T, I> {
     engine: NdjsonEngine<T>,
     bytes_iterator: I
@@ -15,10 +16,20 @@ pub struct NdjsonIter<T, I> {
 
 impl<T, I> NdjsonIter<T, I> {
 
-    /// Creates a new NDJSON-iterator wrapping the given `bytes_iterator`.
+    /// Creates a new NDJSON-iterator wrapping the given `bytes_iterator` with default
+    /// [NdjsonConfig].
     pub fn new(bytes_iterator: I) -> NdjsonIter<T, I> {
         NdjsonIter {
             engine: NdjsonEngine::new(),
+            bytes_iterator
+        }
+    }
+
+    /// Creates a new NDJSON-iterator wrapping the given `bytes_iterator` with the given
+    /// [NdjsonConfig] to control its behavior. See [NdjsonConfig] for more details.
+    pub fn with_config(bytes_iterator: I, config: NdjsonConfig) -> NdjsonIter<T, I> {
+        NdjsonIter {
+            engine: NdjsonEngine::with_config(config),
             bytes_iterator
         }
     }
@@ -47,7 +58,8 @@ where
 
 /// Wraps an iterator of data blocks, i.e. types implementing [AsBytes], obtained by
 /// [IntoIterator::into_iter] on `into_iter` and offers an [Iterator] implementation over parsed
-/// NDJSON-records according to [Deserialize].
+/// NDJSON-records according to [Deserialize]. The parser is configured with the default
+/// [NdjsonConfig].
 ///
 /// Example:
 ///
@@ -71,6 +83,36 @@ where
     NdjsonIter::new(into_iter.into_iter())
 }
 
+/// Wraps an iterator of data blocks, i.e. types implementing [AsBytes], obtained by
+/// [IntoIterator::into_iter] on `into_iter` and offers an [Iterator] implementation over parsed
+/// NDJSON-records according to [Deserialize]. The parser is configured with the given
+/// [NdjsonConfig].
+///
+/// Example:
+///
+/// ```
+/// use ndjson_stream::config::{EmptyLineHandling, NdjsonConfig};
+///
+/// let data_blocks = vec![
+///     "123\n",
+///     "456\n   \n789\n"
+/// ];
+/// let config = NdjsonConfig::default().with_empty_line_handling(EmptyLineHandling::IgnoreBlank);
+///
+/// let mut ndjson_iter = ndjson_stream::from_iter_with_config::<u32, _>(data_blocks, config);
+///
+/// assert!(matches!(ndjson_iter.next(), Some(Ok(123))));
+/// assert!(matches!(ndjson_iter.next(), Some(Ok(456))));
+/// assert!(matches!(ndjson_iter.next(), Some(Ok(789))));
+/// assert!(ndjson_iter.next().is_none());
+/// ```
+pub fn from_iter_with_config<T, I>(into_iter: I, config: NdjsonConfig) -> NdjsonIter<T, I::IntoIter>
+where
+    I: IntoIterator
+{
+    NdjsonIter::with_config(into_iter.into_iter(), config)
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -79,6 +121,7 @@ mod tests {
     use kernal::prelude::*;
 
     use std::iter;
+    use crate::config::EmptyLineHandling;
 
     use crate::test_util::{SingleThenPanicIter, TestStruct};
 
@@ -122,5 +165,27 @@ mod tests {
 
         assert_that!(ndjson_iter.next()).is_some();
         assert_that!(ndjson_iter.next()).is_some();
+    }
+
+    #[test]
+    fn iter_with_parse_always_config_respects_config() {
+        let iter = iter::once("{\"key\":1,\"value\":2}\n\n");
+        let config = NdjsonConfig::default()
+            .with_empty_line_handling(EmptyLineHandling::ParseAlways);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).to_value().is_ok();
+        assert_that!(ndjson_iter.next()).to_value().is_err();
+    }
+
+    #[test]
+    fn iter_with_ignore_empty_config_respects_config() {
+        let iter = iter::once("{\"key\":1,\"value\":2}\n\n");
+        let config = NdjsonConfig::default().
+            with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).to_value().is_ok();
+        assert_that!(ndjson_iter.next()).is_none();
     }
 }

@@ -12,6 +12,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::bytes::AsBytes;
+use crate::config::NdjsonConfig;
 
 pin_project! {
     /// Wraps a [Stream] of data blocks, i.e. types implementing [AsBytes], and offers a [Stream]
@@ -26,10 +27,19 @@ pin_project! {
 
 impl<T, S> NdjsonStream<T, S> {
 
-    /// Creates a new NDJSON-stream wrapping the given `bytes_stream`.
+    /// Creates a new NDJSON-stream wrapping the given `bytes_stream` with default [NdjsonConfig].
     pub fn new(bytes_stream: S) -> NdjsonStream<T, S> {
         NdjsonStream {
             engine: NdjsonEngine::new(),
+            bytes_stream
+        }
+    }
+
+    /// Creates a new NDJSON-stream wrapping the given `bytes_stream` with the given [NdjsonConfig]
+    /// to control its behavior. See [NdjsonConfig] for more details.
+    pub fn with_config(bytes_stream: S, config: NdjsonConfig) -> NdjsonStream<T, S> {
+        NdjsonStream {
+            engine: NdjsonEngine::with_config(config),
             bytes_stream
         }
     }
@@ -64,7 +74,8 @@ where
 }
 
 /// Wraps a [Stream] of data blocks, i.e. types implementing [AsBytes], and offers a [Stream]
-/// implementation over parsed NDJSON-records according to [Deserialize].
+/// implementation over parsed NDJSON-records according to [Deserialize]. The parser is configured
+/// with the default [NdjsonConfig].
 ///
 /// Example:
 ///
@@ -89,9 +100,39 @@ pub fn from_stream<T, S>(bytes_stream: S) -> NdjsonStream<T, S> {
     NdjsonStream::new(bytes_stream)
 }
 
+/// Wraps a [Stream] of data blocks, i.e. types implementing [AsBytes], and offers a [Stream]
+/// implementation over parsed NDJSON-records according to [Deserialize]. The parser is configured
+/// with the given [NdjsonConfig].
+///
+/// Example:
+///
+/// ```
+/// use futures::stream::{self, StreamExt};
+/// use ndjson_stream::config::{EmptyLineHandling, NdjsonConfig};
+///
+/// let data_blocks = vec![
+///     "123\n",
+///     "456\n   \n789\n"
+/// ];
+/// let config = NdjsonConfig::default().with_empty_line_handling(EmptyLineHandling::IgnoreBlank);
+///
+/// let mut ndjson_stream =
+///     ndjson_stream::from_stream_with_config::<u32, _>(stream::iter(data_blocks), config);
+///
+/// tokio_test::block_on(async {
+///     assert!(matches!(ndjson_stream.next().await, Some(Ok(123))));
+///     assert!(matches!(ndjson_stream.next().await, Some(Ok(456))));
+///     assert!(matches!(ndjson_stream.next().await, Some(Ok(789))));
+///     assert!(ndjson_stream.next().await.is_none());
+/// });
+/// ```
+pub fn from_stream_with_config<T, S>(bytes_stream: S, config: NdjsonConfig) -> NdjsonStream<T, S> {
+    NdjsonStream::with_config(bytes_stream, config)
+}
+
 #[cfg(test)]
 mod tests {
-
+    use std::pin::pin;
     use futures::{Stream, StreamExt};
     use futures::stream;
 
@@ -101,6 +142,7 @@ mod tests {
     use tokio_test::task;
 
     use crate::bytes::AsBytes;
+    use crate::config::EmptyLineHandling;
     use crate::test_util::{SingleThenPanicIter, TestStruct};
 
     use super::*;
@@ -158,5 +200,27 @@ mod tests {
 
         assert_that!(tokio_test::block_on(ndjson_stream.next())).is_some();
         assert_that!(tokio_test::block_on(ndjson_stream.next())).is_some();
+    }
+
+    #[test]
+    fn stream_with_parse_always_config_respects_config() {
+        let stream = stream::once(async { "{\"key\":1,\"value\":2}\n\n" });
+        let config = NdjsonConfig::default()
+            .with_empty_line_handling(EmptyLineHandling::ParseAlways);
+        let mut ndjson_stream = pin!(from_stream_with_config::<TestStruct, _>(stream, config));
+
+        assert_that!(tokio_test::block_on(ndjson_stream.next())).to_value().is_ok();
+        assert_that!(tokio_test::block_on(ndjson_stream.next())).to_value().is_err();
+    }
+
+    #[test]
+    fn stream_with_ignore_empty_config_respects_config() {
+        let stream = stream::once(async { "{\"key\":1,\"value\":2}\n\n" });
+        let config = NdjsonConfig::default()
+            .with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+        let mut ndjson_stream = pin!(from_stream_with_config::<TestStruct, _>(stream, config));
+
+        assert_that!(tokio_test::block_on(ndjson_stream.next())).to_value().is_ok();
+        assert_that!(tokio_test::block_on(ndjson_stream.next())).is_none();
     }
 }

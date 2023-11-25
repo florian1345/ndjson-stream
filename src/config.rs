@@ -18,6 +18,9 @@ pub enum EmptyLineHandling {
 }
 
 /// Configuration for the NDJSON-parser which controls the behavior in various situations.
+///
+/// By default, the parser will attempt to parse every line, i.e. every segment between `\n`
+/// characters, even if it is empty. This will result in errors for empty lines.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NdjsonConfig {
     pub(crate) empty_line_handling: EmptyLineHandling
