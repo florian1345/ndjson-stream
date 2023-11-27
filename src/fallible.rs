@@ -13,7 +13,8 @@ pub enum FallibleNdjsonError<E> {
     JsonError(JsonError)
 }
 
-// TODO replace with never-type once available
+// TODO replace with never-type once available (https://github.com/rust-lang/rust/issues/35121)
+
 impl FallibleNdjsonError<Infallible> {
     pub(crate) fn unwrap_json_error(self) -> JsonError {
         match self {
