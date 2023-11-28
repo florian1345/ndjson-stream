@@ -195,7 +195,7 @@ where
 
 /// Wraps an iterator of [Result]s of data blocks, i.e. types implementing [AsBytes], obtained by
 /// [IntoIterator::into_iter] on `into_iter` and offers an [Iterator] implementation over parsed
-/// NDJSON-records according to [Deserialize]. Errors in the wrapped iterator are forwarded via the
+/// NDJSON-records according to [Deserialize]. Errors in the wrapped iterator are forwarded via
 /// [FallibleNdjsonError::InputError], while parsing errors are indicated via
 /// [FallibleNdjsonError::JsonError]. The parser is configured with the default [NdjsonConfig].
 ///
@@ -227,7 +227,7 @@ where
 
 /// Wraps an iterator of [Result]s of data blocks, i.e. types implementing [AsBytes], obtained by
 /// [IntoIterator::into_iter] on `into_iter` and offers an [Iterator] implementation over parsed
-/// NDJSON-records according to [Deserialize]. Errors in the wrapped iterator are forwarded via the
+/// NDJSON-records according to [Deserialize]. Errors in the wrapped iterator are forwarded via
 /// [FallibleNdjsonError::InputError], while parsing errors are indicated via
 /// [FallibleNdjsonError::JsonError]. The parser is configured with the given [NdjsonConfig].
 ///
