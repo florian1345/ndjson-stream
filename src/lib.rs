@@ -22,6 +22,12 @@ pub use crate::driver::streams::from_stream;
 #[cfg(feature = "streams")]
 pub use crate::driver::streams::from_stream_with_config;
 
+#[cfg(feature = "streams")]
+pub use crate::driver::streams::from_fallible_stream;
+
+#[cfg(feature = "streams")]
+pub use crate::driver::streams::from_fallible_stream_with_config;
+
 #[cfg(test)]
 pub(crate) mod test_util {
     use std::borrow::Borrow;
