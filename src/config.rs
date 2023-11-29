@@ -23,7 +23,8 @@ pub enum EmptyLineHandling {
 /// characters, even if it is empty. This will result in errors for empty lines.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NdjsonConfig {
-    pub(crate) empty_line_handling: EmptyLineHandling
+    pub(crate) empty_line_handling: EmptyLineHandling,
+    pub(crate) parse_rest: bool
 }
 
 impl NdjsonConfig {
@@ -36,7 +37,25 @@ impl NdjsonConfig {
     /// A new config with all the same values as this one, except the empty-line-handling.
     pub fn with_empty_line_handling(self, empty_line_handling: EmptyLineHandling) -> NdjsonConfig {
         NdjsonConfig {
-            empty_line_handling
+            empty_line_handling,
+            ..self
+        }
+    }
+
+    /// Creates a new config from this config which has the given configuration on whether to parse
+    /// or ignore the rest, i.e. the part after the last newline character. If `parse_rest` is set
+    /// to `false`, the rest will always be ignored, while `true` causes it to only be ignored if it
+    /// is empty or considered empty by the handling configured in
+    /// [NdjsonConfig::with_empty_line_handling], which by default is only truly empty. Otherwise,
+    /// the rest is parsed like an ordinary JSON record. By default, this is set to `false`.
+    ///
+    /// # Returns
+    ///
+    /// A new config with all the same values as this one, except the parse-rest-flag.
+    pub fn with_parse_rest(self, parse_rest: bool) -> NdjsonConfig {
+        NdjsonConfig {
+            parse_rest,
+            ..self
         }
     }
 }

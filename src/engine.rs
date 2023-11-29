@@ -98,8 +98,6 @@ where
                 &self.in_queue
             };
 
-            // TODO error handling
-
             if let Some(item) = parse_line(next_item_bytes, self.config.empty_line_handling) {
                 self.out_queue.push_back(item);
             }
@@ -109,6 +107,36 @@ where
         }
 
         self.in_queue.extend_from_slice(data);
+    }
+
+    /// Parses the rest leftover from previous calls to [NdjsonEngine::input], i.e. the data after
+    /// the last given newline character, if all of the following conditions are met.
+    ///
+    /// * The engine uses a config with [NdjsonConfig::with_parse_rest] set to `true`.
+    /// * There is non-empty data left to parse. In other words, the previous provided input did not
+    /// end with a newline character.
+    /// * The rest is not considered empty by the handling configured in
+    /// [NdjsonConfig::with_empty_line_handling]. That is, if the rest consists only of whitespace
+    /// and [EmptyLineHandling::IgnoreBlank] is used, the rest is not parsed.
+    ///
+    /// In any case, the rest is discarded from the input buffer.
+    ///
+    /// Note: This function is intended to be called after the input ended, but there is no
+    /// validation in place to check that [NdjsonEngine::input] is not called afterwards. Doing this
+    /// anyway may lead to unexpected behavior, as JSON-lines may be partially discarded.
+    pub fn finalize(&mut self) {
+        if self.config.parse_rest {
+            let empty_line_handling = match self.config.empty_line_handling {
+                EmptyLineHandling::ParseAlways => EmptyLineHandling::IgnoreEmpty,
+                empty_line_handling => empty_line_handling
+            };
+
+            if let Some(item) = parse_line(&self.in_queue, empty_line_handling) {
+                self.out_queue.push_back(item);
+            }
+        }
+
+        self.in_queue.clear();
     }
 }
 
@@ -317,10 +345,15 @@ mod tests {
         assert_that!(engine.out_queue).has_length(count);
     }
 
+    fn configured_engine(configure: impl FnOnce(NdjsonConfig) -> NdjsonConfig)
+            -> NdjsonEngine<TestStruct> {
+        let config = configure(NdjsonConfig::default());
+        NdjsonEngine::with_config(config)
+    }
+
     fn engine_with_empty_line_handling(empty_line_handling: EmptyLineHandling)
             -> NdjsonEngine<TestStruct> {
-        let config = NdjsonConfig::default().with_empty_line_handling(empty_line_handling);
-        NdjsonEngine::with_config(config)
+        configured_engine(|config| config.with_empty_line_handling(empty_line_handling))
     }
 
     #[test]
@@ -366,5 +399,97 @@ mod tests {
         engine.input("{\"key\":1,\"value\":2}\n \t\r\n{\"key\":3,\"value\":4}\n");
 
         assert_that!(collect_output(engine)).does_not_contain_elements_matching(Result::is_err);
+    }
+
+    #[test]
+    fn finalize_ignores_rest_if_parse_rest_is_false() {
+        let mut engine = configured_engine(|config| config.with_parse_rest(false));
+
+        engine.input("{\"key\":1,\"value\":2}");
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).is_empty();
+    }
+
+    #[test]
+    fn finalize_parses_valid_rest() {
+        const EMPTY_LINE_HANDLINGS: [EmptyLineHandling; 3] = [
+            EmptyLineHandling::ParseAlways,
+            EmptyLineHandling::IgnoreEmpty,
+            EmptyLineHandling::IgnoreBlank
+        ];
+
+        for empty_line_handling in EMPTY_LINE_HANDLINGS {
+            let mut engine = configured_engine(|config| config
+                .with_empty_line_handling(empty_line_handling)
+                .with_parse_rest(true));
+
+            engine.input("{\"key\":1,\"value\":2}");
+            engine.finalize();
+
+            assert_that!(collect_output(engine)).satisfies_exactly_in_given_order(dyn_assertions!(
+                |it| assert_that!(it).contains_value(TestStruct { key: 1, value: 2 })
+            ));
+        }
+    }
+
+    #[test]
+    fn finalize_raises_error_on_invalid_rest() {
+        let mut engine = configured_engine(|config| config.with_parse_rest(true));
+
+        engine.input("invalid json");
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).satisfies_exactly_in_given_order(dyn_assertions!(
+            |it| assert_that!(it).is_err()
+        ));
+    }
+
+    #[test]
+    fn finalize_ignores_empty_rest_even_if_empty_line_handling_is_parse_always() {
+        let mut engine = configured_engine(|config| config
+            .with_empty_line_handling(EmptyLineHandling::ParseAlways)
+            .with_parse_rest(true));
+
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).is_empty();
+    }
+
+    #[test]
+    fn finalize_ignores_empty_rest_if_empty_line_handling_is_ignore_empty() {
+        let mut engine = configured_engine(|config| config
+            .with_empty_line_handling(EmptyLineHandling::IgnoreEmpty)
+            .with_parse_rest(true));
+
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).is_empty();
+    }
+
+    #[test]
+    fn finalize_does_not_ignore_non_empty_blank_rest_if_empty_line_handling_is_ignore_empty() {
+        let mut engine = configured_engine(|config| config
+            .with_empty_line_handling(EmptyLineHandling::IgnoreEmpty)
+            .with_parse_rest(true));
+
+        engine.input(" ");
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).satisfies_exactly_in_given_order(dyn_assertions!(
+            |it| assert_that!(it).is_err()
+        ));
+    }
+
+    #[test]
+    fn finalize_ignores_non_empty_blank_rest_if_empty_line_handling_is_ignore_blank() {
+        let mut engine = configured_engine(|config| config
+            .with_empty_line_handling(EmptyLineHandling::IgnoreBlank)
+            .with_parse_rest(true));
+
+        engine.input(" ");
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).is_empty();
     }
 }
