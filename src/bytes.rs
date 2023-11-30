@@ -1,3 +1,5 @@
+//! This module defines the [AsBytes] with baseline implementations.
+
 use std::borrow::Cow;
 use std::rc::Rc;
 use std::sync::Arc;

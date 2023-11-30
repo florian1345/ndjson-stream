@@ -1,3 +1,6 @@
+//! This module defines the configuration options which a NDJSON-parser can be provided. The entry
+//! point is the [NdjsonConfig] struct. Child data types are also defined in this module.
+
 /// Controls how the parser deals with lines that contain no JSON values.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum EmptyLineHandling {
@@ -21,6 +24,17 @@ pub enum EmptyLineHandling {
 ///
 /// By default, the parser will attempt to parse every line, i.e. every segment between `\n`
 /// characters, even if it is empty. This will result in errors for empty lines.
+///
+/// You can construct a config by first calling [NdjsonConfig::default] and then using the
+/// builder-style associated functions to configure it. See the example below.
+///
+/// ```
+/// use ndjson_stream::config::{EmptyLineHandling, NdjsonConfig};
+///
+/// let config = NdjsonConfig::default()
+///     .with_empty_line_handling(EmptyLineHandling::IgnoreBlank)
+///     .with_parse_rest(true);
+/// ```
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NdjsonConfig {
     pub(crate) empty_line_handling: EmptyLineHandling,

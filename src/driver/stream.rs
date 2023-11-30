@@ -98,7 +98,7 @@ where
 /// implementation over parsed NDJSON-records according to [Deserialize]. The parser is configured
 /// with the default [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use futures::stream::{self, StreamExt};
@@ -125,7 +125,7 @@ pub fn from_stream<T, S>(bytes_stream: S) -> NdjsonStream<T, S> {
 /// implementation over parsed NDJSON-records according to [Deserialize]. The parser is configured
 /// with the given [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use futures::stream::{self, StreamExt};
@@ -225,7 +225,7 @@ where
 /// indicated via [FallibleNdjsonError::JsonError]. The parser is configured with the default
 /// [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use futures::stream::{self, StreamExt};
@@ -259,7 +259,7 @@ pub fn from_fallible_stream<T, S>(bytes_stream: S) -> FallibleNdjsonStream<T, S>
 /// indicated via [FallibleNdjsonError::JsonError]. The parser is configured with the given
 /// [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use futures::stream::{self, StreamExt};

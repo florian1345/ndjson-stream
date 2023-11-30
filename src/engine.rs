@@ -1,3 +1,7 @@
+//! This module contains the low-level NDJSON parsing logic in the form of the [NdjsonEngine]. You
+//! should usually not have to use this directly, but rather access a higher-level interface such as
+//! iterators.
+
 use std::collections::VecDeque;
 use std::str;
 

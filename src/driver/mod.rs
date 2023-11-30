@@ -1,3 +1,6 @@
+//! This module contains the higher-level drivers of the NDJSON-parser. Convenience functions to
+//! construct these are found at top-level of the crate.
+
 #[cfg(feature = "iter")]
 pub(crate) mod iter;
 
