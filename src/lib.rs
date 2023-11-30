@@ -116,6 +116,8 @@
 //! * `stream`: Enables the [Stream](futures::Stream)-style interface from the `futures` crate
 //! ([from_stream] family).
 
+#![warn(missing_docs)]
+
 pub mod bytes;
 pub mod config;
 pub mod driver;
