@@ -4,6 +4,7 @@ use crate::engine::NdjsonEngine;
 use crate::fallible::{FallibleNdjsonError, FallibleNdjsonResult};
 
 use std::convert::Infallible;
+use std::iter::Fuse;
 
 use serde::Deserialize;
 
@@ -43,7 +44,10 @@ pub struct NdjsonIter<T, I> {
     inner: FallibleNdjsonIter<T, MapResultInfallible<I>>
 }
 
-impl<T, I> NdjsonIter<T, I> {
+impl<T, I> NdjsonIter<T, I>
+where
+    I: Iterator
+{
 
     /// Creates a new NDJSON-iterator wrapping the given `bytes_iterator` with default
     /// [NdjsonConfig].
@@ -142,17 +146,20 @@ where
 /// [from_fallible_iter_with_config] for more details.
 pub struct FallibleNdjsonIter<T, I> {
     engine: NdjsonEngine<T>,
-    bytes_iterator: I
+    bytes_iterator: Fuse<I>
 }
 
-impl<T, I> FallibleNdjsonIter<T, I> {
+impl<T, I> FallibleNdjsonIter<T, I>
+where
+    I: Iterator
+{
 
     /// Creates a new fallible NDJSON-iterator wrapping the given `bytes_iterator` with default
     /// [NdjsonConfig].
     pub fn new(bytes_iterator: I) -> FallibleNdjsonIter<T, I> {
         FallibleNdjsonIter {
             engine: NdjsonEngine::new(),
-            bytes_iterator
+            bytes_iterator: bytes_iterator.fuse()
         }
     }
 
@@ -161,7 +168,7 @@ impl<T, I> FallibleNdjsonIter<T, I> {
     pub fn with_config(bytes_iterator: I, config: NdjsonConfig) -> FallibleNdjsonIter<T, I> {
         FallibleNdjsonIter {
             engine: NdjsonEngine::with_config(config),
-            bytes_iterator
+            bytes_iterator: bytes_iterator.fuse()
         }
     }
 }
@@ -175,8 +182,6 @@ where
     type Item = FallibleNdjsonResult<T, E>;
 
     fn next(&mut self) -> Option<FallibleNdjsonResult<T, E>> {
-        // TODO handle rest
-
         loop {
             if let Some(result) = self.engine.pop() {
                 return match result {
@@ -185,9 +190,14 @@ where
                 }
             }
 
-            match self.bytes_iterator.next()? {
-                Ok(bytes) => self.engine.input(bytes),
-                Err(error) => return Some(Err(FallibleNdjsonError::InputError(error)))
+            match self.bytes_iterator.next() {
+                Some(Ok(bytes)) => self.engine.input(bytes),
+                Some(Err(error)) => return Some(Err(FallibleNdjsonError::InputError(error))),
+                None => {
+                    self.engine.finalize();
+                    return self.engine.pop()
+                        .map(|res| res.map_err(FallibleNdjsonError::JsonError));
+                }
             }
         }
     }
@@ -329,11 +339,68 @@ mod tests {
     #[test]
     fn iter_with_ignore_empty_config_respects_config() {
         let iter = iter::once("{\"key\":1,\"value\":2}\n\n");
-        let config = NdjsonConfig::default().
-            with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
+        let config = NdjsonConfig::default()
+            .with_empty_line_handling(EmptyLineHandling::IgnoreEmpty);
         let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
 
         assert_that!(ndjson_iter.next()).to_value().is_ok();
+        assert_that!(ndjson_iter.next()).is_none();
+    }
+
+    #[test]
+    fn iter_with_parse_rest_handles_valid_finalization() {
+        let iter = iter::once("{\"key\":1,\"value\":2}");
+        let config = NdjsonConfig::default().with_parse_rest(true);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).to_value().contains_value(TestStruct { key: 1, value: 2 });
+        assert_that!(ndjson_iter.next()).is_none();
+    }
+
+    #[test]
+    fn iter_with_parse_rest_handles_invalid_finalization() {
+        let iter = iter::once("{\"key\":1,");
+        let config = NdjsonConfig::default().with_parse_rest(true);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).to_value().is_err();
+        assert_that!(ndjson_iter.next()).is_none();
+    }
+
+    #[test]
+    fn iter_without_parse_rest_does_not_handle_finalization() {
+        let iter = iter::once("some text");
+        let config = NdjsonConfig::default().with_parse_rest(false);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).is_none();
+    }
+
+    #[test]
+    fn iter_fuses_bytes_iter() {
+        #[derive(Default)]
+        struct NoneThenPanicIter {
+            returned_none: bool
+        }
+
+        impl Iterator for NoneThenPanicIter {
+            type Item = Vec<u8>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.returned_none {
+                    panic!("iterator queried twice");
+                }
+
+                self.returned_none = true;
+                None
+            }
+        }
+
+        let iter = NoneThenPanicIter::default();
+        let config = NdjsonConfig::default().with_parse_rest(true);
+        let mut ndjson_iter: NdjsonIter<TestStruct, _> = from_iter_with_config(iter, config);
+
+        assert_that!(ndjson_iter.next()).is_none();
         assert_that!(ndjson_iter.next()).is_none();
     }
 
