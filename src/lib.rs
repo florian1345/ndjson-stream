@@ -16,17 +16,17 @@ pub use crate::driver::iter::from_fallible_iter;
 #[cfg(feature = "iter")]
 pub use crate::driver::iter::from_fallible_iter_with_config;
 
-#[cfg(feature = "streams")]
-pub use crate::driver::streams::from_stream;
+#[cfg(feature = "stream")]
+pub use crate::driver::stream::from_stream;
 
-#[cfg(feature = "streams")]
-pub use crate::driver::streams::from_stream_with_config;
+#[cfg(feature = "stream")]
+pub use crate::driver::stream::from_stream_with_config;
 
-#[cfg(feature = "streams")]
-pub use crate::driver::streams::from_fallible_stream;
+#[cfg(feature = "stream")]
+pub use crate::driver::stream::from_fallible_stream;
 
-#[cfg(feature = "streams")]
-pub use crate::driver::streams::from_fallible_stream_with_config;
+#[cfg(feature = "stream")]
+pub use crate::driver::stream::from_fallible_stream_with_config;
 
 #[cfg(test)]
 pub(crate) mod test_util {

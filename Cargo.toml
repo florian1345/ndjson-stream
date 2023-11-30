@@ -20,4 +20,4 @@ tokio-test = "0.4"
 [features]
 default = [ "iter" ]
 iter = []
-streams = [ "dep:futures", "dep:pin-project-lite" ]
+stream = [ "dep:futures", "dep:pin-project-lite" ]

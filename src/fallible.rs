@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// The errors which can occur when using a fallible-input-interface, such as
 /// [FallibleNdjsonIter](crate::driver::iter::FallibleNdjsonIter) or
-/// [FallibleNdjsonStream](crate::driver::streams::FallibleNdjsonStream).
+/// [FallibleNdjsonStream](crate::driver::stream::FallibleNdjsonStream).
 #[derive(Error, Debug)]
 pub enum FallibleNdjsonError<E> {
 
