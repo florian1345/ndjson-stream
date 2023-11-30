@@ -119,7 +119,8 @@ where
     /// [NdjsonConfig::with_empty_line_handling]. That is, if the rest consists only of whitespace
     /// and [EmptyLineHandling::IgnoreBlank] is used, the rest is not parsed.
     ///
-    /// In any case, the rest is discarded from the input buffer.
+    /// In any case, the rest is discarded from the input buffer. Therefore, this function is
+    /// idempotent.
     ///
     /// Note: This function is intended to be called after the input ended, but there is no
     /// validation in place to check that [NdjsonEngine::input] is not called afterwards. Doing this
@@ -491,5 +492,18 @@ mod tests {
         engine.finalize();
 
         assert_that!(collect_output(engine)).is_empty();
+    }
+
+    #[test]
+    fn finalize_is_idempotent() {
+        let mut engine = configured_engine(|config| config.with_parse_rest(true));
+
+        engine.input("{\"key\":13,\"value\":37}");
+        engine.finalize();
+        engine.finalize();
+
+        assert_that!(collect_output(engine)).satisfies_exactly_in_given_order(dyn_assertions!(
+            |it| assert_that!(it).contains_value(TestStruct { key: 13, value: 37 })
+        ));
     }
 }
