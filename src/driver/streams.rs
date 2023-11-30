@@ -1,19 +1,15 @@
 use std::convert::Infallible;
-use crate::engine::NdjsonEngine;
-
-use futures::{ready, Stream};
-
-use pin_project_lite::pin_project;
-
-use serde_json::error::Result as JsonResult;
-
-use serde::Deserialize;
-
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use futures::{ready, Stream};
+use pin_project_lite::pin_project;
+use serde::Deserialize;
+use serde_json::error::Result as JsonResult;
+
 use crate::bytes::AsBytes;
 use crate::config::NdjsonConfig;
+use crate::engine::NdjsonEngine;
 use crate::fallible::{FallibleNdjsonError, FallibleNdjsonResult};
 
 pin_project! {
@@ -197,8 +193,6 @@ where
     type Item = FallibleNdjsonResult<T, E>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // TODO handle rest
-
         let mut this = self.project();
 
         loop {
@@ -215,7 +209,11 @@ where
                 Some(Ok(bytes)) => this.engine.input(bytes),
                 Some(Err(error)) =>
                     return Poll::Ready(Some(Err(FallibleNdjsonError::InputError(error)))),
-                None => return Poll::Ready(None)
+                None => {
+                    this.engine.finalize();
+                    return Poll::Ready(this.engine.pop()
+                        .map(|res| res.map_err(FallibleNdjsonError::JsonError)));
+                }
             }
         }
     }
@@ -299,9 +297,7 @@ mod tests {
 
     use futures::{Stream, StreamExt};
     use futures::stream;
-
     use kernal::prelude::*;
-
     use tokio_test::assert_pending;
     use tokio_test::task;
 
@@ -395,6 +391,35 @@ mod tests {
         let mut ndjson_stream = pin!(from_stream_with_config::<TestStruct, _>(stream, config));
 
         assert_that!(ndjson_stream.next_blocking()).to_value().is_ok();
+        assert_that!(ndjson_stream.next_blocking()).is_none();
+    }
+
+    #[test]
+    fn stream_with_parse_rest_handles_valid_finalization() {
+        let stream = stream::once(async { "{\"key\":1,\"value\":2}" });
+        let config = NdjsonConfig::default().with_parse_rest(true);
+        let mut ndjson_stream =  pin!(from_stream_with_config::<TestStruct, _>(stream, config));
+
+        assert_that!(ndjson_stream.next_blocking()).to_value().contains_value(TestStruct { key: 1, value: 2 });
+        assert_that!(ndjson_stream.next_blocking()).is_none();
+    }
+
+    #[test]
+    fn stream_with_parse_rest_handles_invalid_finalization() {
+        let stream = stream::once(async { "{\"key\":1," });
+        let config = NdjsonConfig::default().with_parse_rest(true);
+        let mut ndjson_stream =  pin!(from_stream_with_config::<TestStruct, _>(stream, config));
+
+        assert_that!(ndjson_stream.next_blocking()).to_value().is_err();
+        assert_that!(ndjson_stream.next_blocking()).is_none();
+    }
+
+    #[test]
+    fn stream_without_parse_rest_does_not_handle_finalization() {
+        let stream = stream::once(async { "some text" });
+        let config = NdjsonConfig::default().with_parse_rest(false);
+        let mut ndjson_stream =  pin!(from_stream_with_config::<TestStruct, _>(stream, config));
+
         assert_that!(ndjson_stream.next_blocking()).is_none();
     }
 
