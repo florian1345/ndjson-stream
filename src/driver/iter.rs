@@ -88,7 +88,7 @@ where
 /// NDJSON-records according to [Deserialize]. The parser is configured with the default
 /// [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// let data_blocks = vec![
@@ -115,7 +115,7 @@ where
 /// NDJSON-records according to [Deserialize]. The parser is configured with the given
 /// [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use ndjson_stream::config::{EmptyLineHandling, NdjsonConfig};
@@ -209,7 +209,7 @@ where
 /// [FallibleNdjsonError::InputError], while parsing errors are indicated via
 /// [FallibleNdjsonError::JsonError]. The parser is configured with the default [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use ndjson_stream::fallible::FallibleNdjsonError;
@@ -241,7 +241,7 @@ where
 /// [FallibleNdjsonError::InputError], while parsing errors are indicated via
 /// [FallibleNdjsonError::JsonError]. The parser is configured with the given [NdjsonConfig].
 ///
-/// Example:
+/// # Example
 ///
 /// ```
 /// use ndjson_stream::config::{EmptyLineHandling, NdjsonConfig};

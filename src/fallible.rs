@@ -1,3 +1,6 @@
+//! This module defines the error- and result-type used for fallible NDJSON, i.e. where the data
+//! source can raise an error. See [FallibleNdjsonError] for more details.
+
 use serde_json::Error as JsonError;
 
 use std::convert::Infallible;
