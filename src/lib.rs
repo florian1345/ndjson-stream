@@ -120,6 +120,8 @@
 
 #![warn(missing_docs)]
 
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
+
 pub mod as_bytes;
 pub mod config;
 pub mod driver;
@@ -127,27 +129,35 @@ pub mod engine;
 pub mod fallible;
 
 #[cfg(feature = "iter")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "iter")))]
 pub use crate::driver::iter::from_iter;
 
 #[cfg(feature = "iter")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "iter")))]
 pub use crate::driver::iter::from_iter_with_config;
 
 #[cfg(feature = "iter")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "iter")))]
 pub use crate::driver::iter::from_fallible_iter;
 
 #[cfg(feature = "iter")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "iter")))]
 pub use crate::driver::iter::from_fallible_iter_with_config;
 
 #[cfg(feature = "stream")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "stream")))]
 pub use crate::driver::stream::from_stream;
 
 #[cfg(feature = "stream")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "stream")))]
 pub use crate::driver::stream::from_stream_with_config;
 
 #[cfg(feature = "stream")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "stream")))]
 pub use crate::driver::stream::from_fallible_stream;
 
 #[cfg(feature = "stream")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "stream")))]
 pub use crate::driver::stream::from_fallible_stream_with_config;
 
 #[cfg(test)]

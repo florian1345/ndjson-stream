@@ -45,6 +45,7 @@ impl AsBytes for String {
 }
 
 #[cfg(feature = "bytes")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "bytes")))]
 impl AsBytes for Bytes {
     fn as_bytes(&self) -> &[u8] {
         self.as_ref()
@@ -52,6 +53,7 @@ impl AsBytes for Bytes {
 }
 
 #[cfg(feature = "bytes")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "bytes")))]
 impl AsBytes for BytesMut {
     fn as_bytes(&self) -> &[u8] {
         self.as_ref()
