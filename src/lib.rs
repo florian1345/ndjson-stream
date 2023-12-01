@@ -2,7 +2,7 @@
 //! chunks before reading further, thus enabling a streaming-style use. The crate offers a low-level
 //! interface in the [engine] module and more high-level interfaces for synchronous and asynchronous
 //! NDJSON processing, which are available at the crate root (see for example [from_iter]). The
-//! parser accepts any input which implements the [AsBytes](bytes::AsBytes) trait, which are the
+//! parser accepts any input which implements the [AsBytes](as_bytes::AsBytes) trait, which are the
 //! most common data containers in core Rust and the standard library (e.g. `Vec<u8>` or `&str`).
 //!
 //! `ndjson-stream` uses the [serde] crate to parse individual lines. Hence, the output type of the
@@ -12,7 +12,7 @@
 //!
 //! As an example, we will look at the iterator interface. The most basic form can be instantiated
 //! with [from_iter]. We have to provide an iterator over data blocks, implementing
-//! [AsBytes](bytes::AsBytes), and obtain an iterator over parsed NDJSON-records. Actually, the
+//! [AsBytes](as_bytes::AsBytes), and obtain an iterator over parsed NDJSON-records. Actually, the
 //! exact return type is a `Result` which may contain a JSON-error in case a line is not valid JSON
 //! or does not match the schema of the output type.
 //!
@@ -112,13 +112,15 @@
 //!
 //! # Crate features
 //!
+//! * `bytes`: Offers an implementation of [AsBytes](as_bytes::AsBytes) on [Bytes](bytes::Bytes) and
+//! [BytesMut](bytes::BytesMut) from the [bytes] crate.
 //! * `iter` (default): Enables the [Iterator]-style interface ([from_iter] family).
 //! * `stream`: Enables the [Stream](futures::Stream)-style interface from the `futures` crate
 //! ([from_stream] family).
 
 #![warn(missing_docs)]
 
-pub mod bytes;
+pub mod as_bytes;
 pub mod config;
 pub mod driver;
 pub mod engine;

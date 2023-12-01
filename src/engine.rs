@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use serde_json::error::Result as JsonResult;
 
-use crate::bytes::AsBytes;
+use crate::as_bytes::AsBytes;
 use crate::config::{EmptyLineHandling, NdjsonConfig};
 
 fn index_of<T: Eq>(data: &[T], search: T) -> Option<usize> {

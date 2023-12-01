@@ -1,4 +1,4 @@
-use crate::bytes::AsBytes;
+use crate::as_bytes::AsBytes;
 use crate::config::NdjsonConfig;
 use crate::engine::NdjsonEngine;
 use crate::fallible::{FallibleNdjsonError, FallibleNdjsonResult};
