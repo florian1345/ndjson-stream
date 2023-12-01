@@ -7,7 +7,7 @@ use pin_project_lite::pin_project;
 use serde::Deserialize;
 use serde_json::error::Result as JsonResult;
 
-use crate::bytes::AsBytes;
+use crate::as_bytes::AsBytes;
 use crate::config::NdjsonConfig;
 use crate::engine::NdjsonEngine;
 use crate::fallible::{FallibleNdjsonError, FallibleNdjsonResult};
@@ -301,7 +301,7 @@ mod tests {
     use tokio_test::assert_pending;
     use tokio_test::task;
 
-    use crate::bytes::AsBytes;
+    use crate::as_bytes::AsBytes;
     use crate::config::EmptyLineHandling;
     use crate::test_util::{FallibleNdjsonResultAssertions, SingleThenPanicIter, TestStruct};
 
