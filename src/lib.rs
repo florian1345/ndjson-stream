@@ -5,8 +5,8 @@
 //! parser accepts any input which implements the [AsBytes](as_bytes::AsBytes) trait, which are the
 //! most common data containers in core Rust and the standard library (e.g. `Vec<u8>` or `&str`).
 //!
-//! `ndjson-stream` uses the [serde] crate to parse individual lines. Hence, the output type of the
-//! parser must implement [Deserialize](serde::Deserialize).
+//! `ndjson-stream` uses the [serde_json] crate to parse individual lines. Hence, the output type of
+//! the parser must implement [Deserialize](serde::Deserialize).
 //!
 //! # High-level example
 //!
@@ -16,7 +16,7 @@
 //! exact return type is a `Result` which may contain a JSON-error in case a line is not valid JSON
 //! or does not match the schema of the output type.
 //!
-//! The example below demonstrates both the happy-path as well as parsing errors.
+//! The example below demonstrates both the happy-path and parsing errors.
 //!
 //! ```
 //! use serde::Deserialize;
@@ -85,7 +85,7 @@
 //! [FallibleNdjsonError](fallible::FallibleNdjsonError) for more details on how the error is
 //! communicated.
 //!
-//! In the example below, we use a fallible iterator interface.
+//! In the example below, we use a fallible iterator.
 //!
 //! ```
 //! use ndjson_stream::fallible::FallibleNdjsonError;
